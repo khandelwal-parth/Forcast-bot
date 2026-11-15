@@ -1,0 +1,48 @@
+name: Quant Bot daily run
+
+# Weekdays 23:30 UTC (after US and India markets close): resolve outcomes, log predictions for the
+# whole universe, retrain the model when due. Weekends 12:00 UTC: heartbeat only, so Supabase
+# sees activity every single day and never reaches its 7-day inactivity pause.
+on:
+  schedule:
+    - cron: "30 23 * * 1-5"
+    - cron: "0 12 * * 0,6"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = everything, light = heartbeat + outcome check"
+        type: choice
+        options: [full, light]
+        default: full
+      force_retrain:
+        description: "Retrain the model even if the champion is fresh"
+        type: boolean
+        default: false
+
+concurrency:
+  group: quant-bot-daily
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run job
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.schedule == '0 12 * * 0,6' && 'light' || 'full') }}
+          FORCE: ${{ inputs.force_retrain && '--force-retrain' || '' }}
+        run: python -m jobs.daily --mode "$MODE" $FORCE

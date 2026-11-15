@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: quant-bot
+    env: python
+    region: oregon
+    branch: main
+    buildCommand: "pip install -r requirements.txt"
+    # One worker: the champion model lives in memory and the background thread should run once.
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120"
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL          # Supabase *pooler* connection string
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: CRON_TOKEN            # random string; enables /api/cron?token=... keep-alive pings
+        sync: false
+      - key: ALPHAVANTAGE_API_KEY  # optional fallback data source
+        sync: false
