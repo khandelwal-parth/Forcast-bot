@@ -1,420 +1,163 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Accuracy — Quant Bot</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+{% extends "base.html" %}
+{% block title %}Scorecard | Quant Bot{% endblock %}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: #f0f0eb;
-            color: #1a1a1a;
-            min-height: 100vh;
-        }
+{% block content %}
+{% set o = data.overall %}
+<div class="wrap">
+    <section class="page-head">
+        <h1>Scorecard</h1>
+        <p>Every call the model makes is saved, then checked against the real price 5 trading days later. Neutral calls are not scored.</p>
+    </section>
 
-        /* ── Nav (matches your existing nav) ── */
-        nav {
-            background: #1a1a1a;
-            padding: 12px 24px;
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-        nav a {
-            color: #aaa;
-            text-decoration: none;
-            font-size: 13px;
-            letter-spacing: 0.05em;
-        }
-        nav a:hover { color: #fff; }
-        nav a.active { color: #fff; }
-
-        /* ── Layout ── */
-        .container {
-            max-width: 1100px;
-            margin: 40px auto;
-            padding: 0 24px;
-        }
-
-        h1 {
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-        .subtitle {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 32px;
-        }
-
-        /* ── Stat Cards ── */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-
-        .stat-card {
-            background: #fff;
-            border: 1px solid #e0e0d8;
-            border-radius: 8px;
-            padding: 20px 24px;
-        }
-        .stat-card .label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #888;
-            margin-bottom: 8px;
-        }
-        .stat-card .value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #1a1a1a;
-        }
-        .stat-card .value.green { color: #16a34a; }
-        .stat-card .value.red   { color: #dc2626; }
-        .stat-card .sub {
-            font-size: 12px;
-            color: #999;
-            margin-top: 4px;
-        }
-
-        /* ── Section ── */
-        .section {
-            background: #fff;
-            border: 1px solid #e0e0d8;
-            border-radius: 8px;
-            padding: 24px;
-            margin-bottom: 24px;
-        }
-        .section h2 {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #e0e0d8;
-        }
-
-        /* ── Per Symbol Table ── */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-        th {
-            text-align: left;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: #888;
-            padding: 0 12px 10px 0;
-            border-bottom: 1px solid #e0e0d8;
-        }
-        td {
-            padding: 10px 12px 10px 0;
-            border-bottom: 1px solid #f0f0eb;
-            color: #333;
-        }
-        tr:last-child td { border-bottom: none; }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-        }
-        .badge.buy    { background: #dcfce7; color: #16a34a; }
-        .badge.sell   { background: #fee2e2; color: #dc2626; }
-        .badge.hold   { background: #fef9c3; color: #a16207; }
-        .badge.up     { background: #dcfce7; color: #16a34a; }
-        .badge.down   { background: #fee2e2; color: #dc2626; }
-        .badge.correct   { background: #dcfce7; color: #16a34a; }
-        .badge.incorrect { background: #fee2e2; color: #dc2626; }
-        .badge.pending   { background: #f1f5f9; color: #64748b; }
-        .badge.neutral   { background: #f1f5f9; color: #64748b; }
-
-        /* ── Win Rate Bar ── */
-        .win-bar-wrap {
-            background: #f0f0eb;
-            border-radius: 4px;
-            height: 8px;
-            margin-top: 6px;
-            overflow: hidden;
-        }
-        .win-bar {
-            height: 100%;
-            border-radius: 4px;
-            background: #16a34a;
-            transition: width 0.6s ease;
-        }
-
-        /* ── Empty state ── */
-        .empty {
-            text-align: center;
-            padding: 48px;
-            color: #999;
-            font-size: 14px;
-        }
-        .empty .icon { font-size: 40px; margin-bottom: 12px; }
-
-        /* ── Direction breakdown ── */
-        .direction-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-        .direction-card {
-            background: #f9f9f6;
-            border: 1px solid #e0e0d8;
-            border-radius: 6px;
-            padding: 16px;
-        }
-        .direction-card .dir-label {
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 8px;
-        }
-        .direction-card.up .dir-label { color: #16a34a; }
-        .direction-card.down .dir-label { color: #dc2626; }
-        .direction-card .dir-rate {
-            font-size: 24px;
-            font-weight: 700;
-        }
-        .direction-card .dir-sub {
-            font-size: 12px;
-            color: #888;
-            margin-top: 2px;
-        }
-
-        footer {
-            text-align: center;
-            padding: 32px;
-            font-size: 12px;
-            color: #aaa;
-        }
-    </style>
-</head>
-<body>
-
-<nav>
-    <a href="/">← Back to Analysis</a>
-    <a href="/accuracy" class="active">Accuracy</a>
-</nav>
-
-<div class="container">
-    <h1>Prediction Accuracy</h1>
-    <p class="subtitle">Live, out-of-sample tracking of Quant Bot's 5-trading-day direction calls. Neutral calls are not scored. A win rate only means something compared with the &ldquo;always UP&rdquo; baseline.</p>
-
-    <!-- ── Overall Stats ── -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="label">Overall Win Rate</div>
-            <div class="value {% if data.overall.win_rate >= 55 %}green{% elif data.overall.win_rate < 45 %}red{% endif %}">
-                {{ data.overall.win_rate }}%
+    <section class="sec" style="border-top:0;padding-top:0">
+        <h2>Is it better than guessing?</h2>
+        <p class="lede">A win rate only means something next to the &ldquo;always UP&rdquo; baseline, because most stocks rise more often than they fall.</p>
+        <div class="compare">
+            <div class="cmp-row">
+                <span>Model win rate</span>
+                <div class="bar"><i style="width: {{ o.win_rate }}%"></i></div>
+                <b>{{ o.win_rate }}%</b>
             </div>
-            <div class="sub">{{ data.overall.correct }} correct of {{ data.overall.total }} total</div>
-            <div class="win-bar-wrap">
-                <div class="win-bar" style="width: {{ data.overall.win_rate }}%"></div>
+            <div class="cmp-row base">
+                <span>Always-UP Baseline</span>
+                <div class="bar"><i style="width: {{ o.baseline_up_rate }}%"></i></div>
+                <b>{{ o.baseline_up_rate }}%</b>
             </div>
         </div>
-
-        <div class="stat-card">
-            <div class="label">Total Predictions</div>
-            <div class="value">{{ data.overall.total }}</div>
-            <div class="sub">Checked predictions so far</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="label">Correct Calls</div>
-            <div class="value green">{{ data.overall.correct }}</div>
-            <div class="sub">Right direction predictions</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="label">Wrong Calls</div>
-            <div class="value red">{{ data.overall.total - data.overall.correct }}</div>
-            <div class="sub">Wrong direction predictions</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="label">Always-UP Baseline</div>
-            <div class="value">{{ data.overall.baseline_up_rate }}%</div>
-            <div class="sub">Win rate of blindly predicting UP</div>
-        </div>
-
-        <div class="stat-card">
-            <div class="label">Edge vs Baseline</div>
-            <div class="value {% if data.overall.edge > 0 %}green{% elif data.overall.edge < 0 %}red{% endif %}">{{ '%+.1f' | format(data.overall.edge) }} pts</div>
-            <div class="sub">{{ data.overall.pending }} pending · {{ data.overall.neutral }} neutral (not scored)</div>
-        </div>
-    </div>
-
-    <!-- ── UP vs DOWN accuracy ── -->
-    <div class="section">
-        <h2>Accuracy by Direction</h2>
-        <div class="direction-grid">
-            <div class="direction-card up">
-                <div class="dir-label">▲ UP Predictions</div>
-                <div class="dir-rate">{{ data.by_direction.up.win_rate }}%</div>
-                <div class="dir-sub">{{ data.by_direction.up.correct }} / {{ data.by_direction.up.total }} correct</div>
-                <div class="win-bar-wrap">
-                    <div class="win-bar" style="width: {{ data.by_direction.up.win_rate }}%"></div>
-                </div>
-            </div>
-            <div class="direction-card down">
-                <div class="dir-label">▼ DOWN Predictions</div>
-                <div class="dir-rate">{{ data.by_direction.down.win_rate }}%</div>
-                <div class="dir-sub">{{ data.by_direction.down.correct }} / {{ data.by_direction.down.total }} correct</div>
-                <div class="win-bar-wrap">
-                    <div class="win-bar" style="width: {{ data.by_direction.down.win_rate }}%"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── Per Symbol ── -->
-    <div class="section">
-        <h2>By Stock</h2>
-        {% if data.by_symbol %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Win Rate</th>
-                    <th>Correct</th>
-                    <th>Total</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in data.by_symbol %}
-                <tr>
-                    <td><strong>{{ s.symbol }}</strong></td>
-                    <td>
-                        <strong class="{% if s.win_rate >= 55 %}" style="color:#16a34a{% elif s.win_rate < 45 %}" style="color:#dc2626{% endif %}">
-                            {{ s.win_rate }}%
-                        </strong>
-                    </td>
-                    <td>{{ s.correct }}</td>
-                    <td>{{ s.total }}</td>
-                    <td style="width:120px">
-                        <div class="win-bar-wrap">
-                            <div class="win-bar" style="width:{{ s.win_rate }}%"></div>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% if o.total == 0 %}
+        <p class="edge">No results yet</p>
+        <p class="note">The first predictions finish their 5-day check about a week after the daily job starts. Come back then.</p>
         {% else %}
-        <div class="empty">
-            <div class="icon">📊</div>
-            No data yet. Run some analyses and check back tomorrow!
-        </div>
+        <p class="edge {% if o.edge > 0 %}up{% elif o.edge < 0 %}down{% endif %}">{{ '%+.1f' | format(o.edge) }} points vs the baseline</p>
+        {% if o.total < 100 %}
+        <p class="note warn">Only {{ o.total }} scored so far. Gaps this small can easily be luck, so wait for a few hundred results before reading anything into them.</p>
         {% endif %}
-    </div>
+        {% endif %}
+    </section>
 
-    <!-- ── Model history ── -->
-    <div class="section">
+    <section class="sec">
+        <div class="counts">
+            <div><div class="n">{{ o.total }}</div><div class="l">Scored calls</div></div>
+            <div><div class="n up">{{ o.correct }}</div><div class="l">Right direction</div></div>
+            <div><div class="n down">{{ o.total - o.correct }}</div><div class="l">Wrong direction</div></div>
+            <div><div class="n">{{ o.pending }}</div><div class="l">Waiting for the 5 days</div></div>
+            <div><div class="n">{{ o.neutral }}</div><div class="l">Neutral, not scored</div></div>
+        </div>
+    </section>
+
+    <section class="sec">
+        <h2>Accuracy by direction</h2>
+        <p class="lede">Win rate when the model said the price would rise, and when it said it would fall.</p>
+        <div class="compare">
+            <div class="cmp-row">
+                <span>UP calls ({{ data.by_direction.up.correct }}/{{ data.by_direction.up.total }})</span>
+                <div class="bar"><i style="width: {{ data.by_direction.up.win_rate }}%"></i></div>
+                <b>{{ data.by_direction.up.win_rate }}%</b>
+            </div>
+            <div class="cmp-row">
+                <span>DOWN calls ({{ data.by_direction.down.correct }}/{{ data.by_direction.down.total }})</span>
+                <div class="bar"><i style="width: {{ data.by_direction.down.win_rate }}%"></i></div>
+                <b>{{ data.by_direction.down.win_rate }}%</b>
+            </div>
+        </div>
+    </section>
+
+    <section class="sec">
         <h2>Model Training History</h2>
+        <p class="lede">The bot retrains itself about once a week. Skill is how much better its probabilities are than the historical base rate in testing; above zero is better.</p>
         {% if data.training_runs %}
+        <div class="scroll">
         <table>
-            <thead><tr><th>Version</th><th>Decision</th><th>Model</th><th>Tickers</th><th>Skill</th><th>AUC</th><th>Proven edge</th><th>Date</th></tr></thead>
+            <thead><tr><th>Version</th><th>Result</th><th>Model</th><th class="r">Stocks</th><th class="r">Skill</th><th class="r">AUC</th><th>Passed testing</th><th>Date</th></tr></thead>
             <tbody>
                 {% for r in data.training_runs %}
                 <tr>
                     <td><strong>{{ r.version }}</strong></td>
-                    <td><span class="badge {{ 'correct' if r.decision == 'promoted' else 'pending' }}">{{ r.decision }}</span></td>
+                    <td><span class="pill {{ 'up' if r.decision == 'promoted' else '' }}">{{ r.decision }}</span></td>
                     <td>{{ r.candidate }}</td>
-                    <td>{{ r.n_tickers }}</td>
-                    <td>{{ '%+.4f' | format(r.skill) if r.skill is not none else '—' }}</td>
-                    <td>{{ '%.3f' | format(r.auc) if r.auc is not none else '—' }}</td>
-                    <td>{{ 'Yes' if r.reliable else 'No' }}</td>
-                    <td style="color:#888;font-size:12px">{{ r.created_at|string|truncate(10, killwords=True, end='') }}</td>
+                    <td class="r">{{ r.n_tickers }}</td>
+                    <td class="r">{{ '%+.4f' | format(r.skill) if r.skill is not none else '-' }}</td>
+                    <td class="r">{{ '%.3f' | format(r.auc) if r.auc is not none else '-' }}</td>
+                    <td>{{ 'Yes' if r.reliable else 'Not yet' }}</td>
+                    <td>{{ r.created_at|string|truncate(10, killwords=True, end='') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <p style="font-size:12px;color:#888;margin-top:8px">Skill = improvement in log-loss over predicting the historical base rate (walk-forward, out-of-sample). Positive is better.</p>
+        </div>
         {% else %}
-        <div class="empty"><div class="icon">🧠</div>The first training run happens at the next scheduled job.</div>
+        <p class="empty">No training runs yet. The first one happens the next time the scheduled job runs.</p>
         {% endif %}
-    </div>
+    </section>
 
-    <!-- ── Recent Predictions ── -->
-    <div class="section">
-        <h2>Recent Predictions</h2>
+    {% if data.by_model %}
+    <section class="sec">
+        <h2>By model version</h2>
+        <p class="lede">Live results for each version, so you can see whether newer models do better in practice.</p>
+        <div class="scroll">
+        <table>
+            <thead><tr><th>Version</th><th class="r">Scored</th><th class="r">Correct</th><th class="r">Win rate</th></tr></thead>
+            <tbody>
+                {% for m in data.by_model %}
+                <tr><td><strong>{{ m.model_version }}</strong></td><td class="r">{{ m.total }}</td><td class="r">{{ m.correct }}</td><td class="r">{{ m.win_rate }}%</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if data.by_symbol %}
+    <section class="sec">
+        <h2>By stock</h2>
+        <div class="scroll">
+        <table>
+            <thead><tr><th>Symbol</th><th class="r">Scored</th><th class="r">Correct</th><th class="r">Win rate</th></tr></thead>
+            <tbody>
+                {% for s in data.by_symbol %}
+                <tr><td><strong>{{ s.symbol }}</strong></td><td class="r">{{ s.total }}</td><td class="r">{{ s.correct }}</td><td class="r">{{ s.win_rate }}%</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="sec">
+        <h2>Recent predictions</h2>
         {% if data.recent_predictions %}
+        <div class="scroll">
         <table>
             <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Predicted</th>
-                    <th>Actual</th>
-                    <th>Price Then</th>
-                    <th>Price After</th>
-                    <th>Result</th>
-                    <th>Date</th>
-                </tr>
+                <tr><th>Stock</th><th>Called</th><th>Actual</th><th class="r">Price then</th><th class="r">Price after</th><th>Result</th><th>Date</th></tr>
             </thead>
             <tbody>
                 {% for p in data.recent_predictions %}
+                {% set cur = '₹' if p.symbol.endswith(('.NS', '.BO')) else '$' %}
                 <tr>
                     <td><strong>{{ p.symbol }}</strong></td>
+                    <td><span class="pill {{ p.predicted_direction | lower }}">{{ p.predicted_direction }}</span></td>
                     <td>
-                        <span class="badge {{ p.predicted_direction | lower }}">
-                            {{ p.predicted_direction }}
-                        </span>
+                        {% if p.actual_direction %}<span class="pill {{ p.actual_direction | lower }}">{{ p.actual_direction }}</span>
+                        {% else %}<span class="pill">Waiting</span>{% endif %}
                     </td>
+                    <td class="r">{{ cur }}{{ "%.2f" | format(p.price_at_prediction) }}</td>
+                    <td class="r">{% if p.actual_price %}{{ cur }}{{ "%.2f" | format(p.actual_price) }}{% else %}-{% endif %}</td>
                     <td>
-                        {% if p.actual_direction %}
-                        <span class="badge {{ p.actual_direction | lower }}">{{ p.actual_direction }}</span>
-                        {% else %}
-                        <span class="badge pending">Pending</span>
-                        {% endif %}
+                        {% if p.was_correct == 1 %}<span class="pill up">Right</span>
+                        {% elif p.was_correct == 0 %}<span class="pill down">Wrong</span>
+                        {% elif p.predicted_direction == 'NEUTRAL' and p.actual_price %}<span class="pill neutral">Not scored</span>
+                        {% else %}<span class="pill">Waiting</span>{% endif %}
                     </td>
-                    <td>${{ "%.2f" | format(p.price_at_prediction) }}</td>
-                    <td>
-                        {% if p.actual_price %}
-                            ${{ "%.2f" | format(p.actual_price) }}
-                        {% else %}—{% endif %}
-                    </td>
-                    <td>
-                        {% if p.was_correct == 1 %}
-                            <span class="badge correct">✓ Correct</span>
-                        {% elif p.was_correct == 0 %}
-                            <span class="badge incorrect">✗ Wrong</span>
-                        {% elif p.predicted_direction == 'NEUTRAL' and p.actual_price %}
-                            <span class="badge pending">Not scored</span>
-                        {% else %}
-                            <span class="badge pending">Pending</span>
-                        {% endif %}
-                    </td>
-                    <td style="color:#888;font-size:12px">
-                        {{ p.created_at|string|truncate(10, killwords=True, end='') }}
-                    </td>
+                    <td>{{ p.created_at|string|truncate(10, killwords=True, end='') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% else %}
-        <div class="empty">
-            <div class="icon">🔮</div>
-            No predictions resolved yet. Outcomes are verified once the 5-trading-day horizon has passed.
         </div>
+        {% else %}
+        <p class="empty">Nothing here yet. Predictions appear after the daily job runs and are checked once their 5 trading days have passed.</p>
         {% endif %}
-    </div>
+    </section>
 </div>
-
-<footer>© 2026 Quant Bot — Predictions are logged and verified automatically every weekday.</footer>
-
-</body>
-</html>
+{% endblock %}

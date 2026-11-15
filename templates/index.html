@@ -1,585 +1,308 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quant Bot — Institutional-Grade AI Stock Analysis</title>
-    <meta name="description" content="Enter any ticker symbol and receive comprehensive quantitative analysis powered by algorithms used at top-tier institutions.">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #f5f4f0;
-            --bg-card: #ffffff;
-            --border: #e0ddd6;
-            --text: #1a1a18;
-            --text-muted: #7a7971;
-            --accent: #c8a96e;
-            --accent-dark: #8b5e2a;
-            --color-buy: #1a6640;
-            --color-sell: #8b1a1a;
-            --color-hold: #6b5a1a;
-        }
+{% extends "base.html" %}
+{% block title %}Quant Bot: stock analysis{% endblock %}
+{% block head %}<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" defer></script>{% endblock %}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block content %}
+<div class="wrap">
+    <section class="page-head">
+        <h1>Look up a stock</h1>
+        <p>Chart signals, company numbers and a 5-day model outlook for US and Indian stocks. The model counts toward the score only after it has proven itself in testing.</p>
+    </section>
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-        }
-
-        /* ─── NAV ─── */
-        nav {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 20px 60px;
-            border-bottom: 1px solid var(--border);
-            background: var(--bg);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .nav-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-family: 'Playfair Display', serif;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--text);
-            text-decoration: none;
-        }
-        .nav-logo .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
-        .nav-links { display: flex; gap: 40px; list-style: none; align-items: center; }
-        .nav-links a {
-            font-size: 0.78rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-        .nav-links a:hover { color: var(--text); }
-        .nav-links a.active { color: var(--text); border-bottom: 1px solid var(--text); padding-bottom: 2px; }
-
-        /* accuracy link — subtle pill style */
-        .nav-links a.accuracy-link {
-            font-size: 0.72rem;
-            letter-spacing: 0.1em;
-            color: var(--accent-dark);
-            border: 1px solid var(--accent);
-            padding: 4px 12px;
-            border-radius: 2px;
-            transition: all 0.2s;
-        }
-        .nav-links a.accuracy-link:hover {
-            background: var(--accent);
-            color: white;
-        }
-
-        /* ─── HERO ─── */
-        .hero {
-            min-height: calc(100vh - 62px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 80px 60px 100px;
-            border-bottom: 1px solid var(--border);
-            position: relative;
-        }
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.72rem;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: var(--accent-dark);
-            margin-bottom: 32px;
-        }
-        .hero-badge::before { content: ''; width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
-        .hero h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: 6.5rem;
-            line-height: 1.0;
-            font-weight: 700;
-            color: var(--text);
-            margin-bottom: 28px;
-            max-width: 720px;
-        }
-        .hero h1 em { font-style: italic; color: var(--accent-dark); }
-        .hero > p {
-            font-size: 1.05rem;
-            color: var(--text-muted);
-            line-height: 1.75;
-            max-width: 520px;
-            margin-bottom: 56px;
-        }
-        .feature-list {
-            display: flex;
-            gap: 48px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .feature-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
-        .feature-item::before { content: '✓'; font-size: 0.75rem; color: var(--color-buy); font-weight: 600; }
-
-        .scroll-cue {
-            position: absolute;
-            bottom: 32px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.68rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-        }
-        .scroll-cue span { animation: nudge 2s ease-in-out infinite; display: block; }
-        .scroll-line { width: 1px; height: 36px; background: linear-gradient(to bottom, var(--accent), transparent); }
-        @keyframes nudge { 0%,100%{transform:translateY(0)}50%{transform:translateY(5px)} }
-
-        /* ─── SEARCH SECTION ─── */
-        .search-section {
-            background: #faf9f6;
-            border-bottom: 1px solid var(--border);
-            padding: 72px 60px 64px;
-        }
-        .search-inner { max-width: 660px; margin: 0 auto; }
-        .search-eyebrow {
-            font-size: 0.72rem;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-        }
-        .search-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.2rem;
-            margin-bottom: 6px;
-        }
-        .search-sub { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 32px; }
-        .search-row {
-            display: flex;
-            border: 1px solid var(--text);
-            background: white;
-            margin-bottom: 12px;
-        }
-        .search-row input {
-            flex: 1;
-            padding: 18px 24px;
-            font-size: 1.05rem;
-            font-family: 'Inter', sans-serif;
-            border: none;
-            outline: none;
-            background: transparent;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text);
-        }
-        .search-row input::placeholder { color: var(--text-muted); text-transform: none; letter-spacing: 0; }
-        .search-row button {
-            padding: 18px 36px;
-            background: var(--text);
-            color: white;
-            border: none;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.78rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .search-row button:hover { background: #333; }
-
-        /* ─── SEARCH HINT + INFO ICON ─── */
-        .search-hint {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .info-icon {
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 1px solid var(--text-muted);
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            cursor: default;
-            flex-shrink: 0;
-            line-height: 1;
-            user-select: none;
-        }
-        .info-icon:hover { border-color: var(--accent-dark); color: var(--accent-dark); }
-        .info-tooltip {
-            display: none;
-            position: absolute;
-            bottom: calc(100% + 10px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--text);
-            color: #f5f4f0;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.76rem;
-            line-height: 1.6;
-            padding: 10px 14px;
-            width: 230px;
-            z-index: 999;
-            pointer-events: none;
-            white-space: normal;
-        }
-        .info-tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 5px solid transparent;
-            border-top-color: var(--text);
-        }
-        .info-icon:hover .info-tooltip { display: block; }
-
-        .loading-state { display: none; padding: 32px 0; }
-        .loading-bar { width: 100%; height: 1px; background: var(--border); position: relative; overflow: hidden; margin-bottom: 14px; }
-        .loading-bar::after { content: ''; position: absolute; left: -40%; width: 40%; height: 100%; background: var(--accent); animation: load 1.2s ease-in-out infinite; }
-        @keyframes load { to { left: 100%; } }
-        .loading-text { font-size: 0.8rem; color: var(--text-muted); letter-spacing: 0.06em; }
-        .error-box { display: none; padding: 14px 18px; background: #fef2f2; border: 1px solid #fca5a5; color: var(--color-sell); font-size: 0.88rem; margin-top: 16px; }
-
-        /* ─── DASHBOARD ─── */
-        #dashboard { display: none; }
-
-        .rec-banner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 36px 60px;
-            border-bottom: 1px solid var(--border);
-            background: white;
-        }
-        .rec-label { font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
-        .rec-verdict { font-family: 'Playfair Display', serif; font-size: 3.2rem; font-weight: 700; }
-        .rec-score { font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; }
-        .rec-right { text-align: right; }
-        .rec-company { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
-        .rec-meta { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
-
-        .dashboard-wrap { padding: 0 60px 80px; }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            background: var(--border);
-            border: 1px solid var(--border);
-            margin: 40px 0;
-        }
-        .metric-card { background: white; padding: 28px 24px; }
-        .metric-card-title { font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 18px; }
-
-        .metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-        .metric-row:last-child { border-bottom: none; }
-        .metric-row .lbl { color: var(--text-muted); }
-        .metric-row .val { font-weight: 500; color: var(--text); }
-        .val.pos { color: var(--color-buy); }
-        .val.neg { color: var(--color-sell); }
-
-        .signal-wrap { display: flex; flex-direction: column; gap: 4px; }
-        .signal-group-title { font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin-top: 10px; }
-        .signal-group-title:first-child { margin-top: 0; }
-        .signal-tag { display: inline-block; padding: 3px 9px; font-size: 0.74rem; letter-spacing: 0.04em; border: 1px solid; margin: 2px 2px 0 0; }
-        .s-buy { color: var(--color-buy); border-color: var(--color-buy); background: #f0faf4; }
-        .s-sell { color: var(--color-sell); border-color: var(--color-sell); background: #fdf2f2; }
-        .s-neutral { color: var(--text-muted); border-color: var(--border); }
-
-        .chart-section { border: 1px solid var(--border); margin-bottom: 40px; background: white; }
-        .chart-header { padding: 16px 24px; border-bottom: 1px solid var(--border); font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
-
-        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 40px; }
-        .bottom-card { background: white; padding: 28px 24px; }
-
-        .price-group-title { font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin: 16px 0 8px; }
-        .price-group-title:first-child { margin-top: 0; }
-        .price-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-        .price-item:last-child { border-bottom: none; }
-        .price-item .pi-label { color: var(--text-muted); }
-
-        .reason-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; }
-        .reason-item:last-child { border-bottom: none; }
-        .reason-item::before { content: '—'; color: var(--accent); flex-shrink: 0; }
-
-        footer { border-top: 1px solid var(--border); padding: 22px 60px; display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); }
-    </style>
-    <meta name="google-site-verification" content="o4RLZbqamESNEAuGHqr3fOhl2rnXD8Ai72uQgYbeORc" />
-</head>
-<body>
-
-<nav>
-    <a class="nav-logo" href="#"><span class="logo-dot"></span>Quant Bot</a>
-    <ul class="nav-links">
-        <li><a href="#">Methodology</a></li>
-        <li><a href="#">Institutional</a></li>
-        <li><a href="#" class="active">Terminal Access</a></li>
-        <li><a href="/accuracy" class="accuracy-link">📊 Accuracy</a></li>
-    </ul>
-</nav>
-
-<!-- HERO -->
-<section class="hero">
-    <div class="hero-badge">Institutional-Grade</div>
-    <h1>AI Stock<br><em>Analysis</em></h1>
-    <p>Enter any ticker symbol and receive comprehensive quantitative analysis — powered by algorithms used at top-tier institutions.</p>
-    <div class="feature-list">
-        <div class="feature-item">Real-time data</div>
-        <div class="feature-item">Deep fundamentals</div>
-        <div class="feature-item">AI signals</div>
-        <div class="feature-item">ML predictions</div>
-        <div class="feature-item">Price levels</div>
-    </div>
-    <div class="scroll-cue">
-        <div class="scroll-line"></div>
-        <span>Scroll to analyze</span>
-    </div>
-</section>
-
-<!-- SEARCH -->
-<section class="search-section">
-    <div class="search-inner">
-        <div class="search-eyebrow">Run an Analysis</div>
-        <div class="search-title">Enter a Ticker Symbol</div>
-        <div class="search-sub">Supports US, Indian (NSE/BSE), and all global exchanges.</div>
-        <div class="search-row">
-            <input type="text" id="symbolInput" placeholder="e.g. AAPL, SBIN, TSLA" value="AAPL">
-            <button onclick="analyze()">Analyze</button>
-        </div>
-        <div class="search-hint">
-            Press Enter or click Analyze to start.
-            <span class="info-icon">
-                i
-                <span class="info-tooltip">If the analysis doesn't load, press Analyze again — the server may be waking up from sleep on first visit.</span>
-            </span>
-        </div>
-        <div class="loading-state" id="loading">
-            <div class="loading-bar"></div>
-            <div class="loading-text">Running full market analysis...</div>
-        </div>
-        <div class="error-box" id="error"></div>
-    </div>
-</section>
-
-<!-- DASHBOARD -->
-<div id="dashboard">
-    <div class="rec-banner">
-        <div>
-            <div class="rec-label">Composite Recommendation</div>
-            <div class="rec-verdict" id="recVerdict">—</div>
-            <div class="rec-score" id="recScore"></div>
-        </div>
-        <div class="rec-right">
-            <div class="rec-company" id="companyName">—</div>
-            <div class="rec-meta" id="companyMeta"></div>
-        </div>
+    <form class="finder" id="finder" role="search" autocomplete="off">
+        <label for="symbolInput" class="skip" style="left:-999px">Ticker symbol</label>
+        <input type="text" id="symbolInput" placeholder="Ticker, e.g. AAPL or RELIANCE" inputmode="text" autocapitalize="characters" spellcheck="false" aria-describedby="hint">
+        <button class="btn" id="goBtn" type="submit">Analyze</button>
+    </form>
+    <div class="chips" id="hint">
+        Try
+        <button class="chip" type="button" data-sym="AAPL">AAPL</button>
+        <button class="chip" type="button" data-sym="NVDA">NVDA</button>
+        <button class="chip" type="button" data-sym="TCS.NS">TCS.NS</button>
+        <button class="chip" type="button" data-sym="RELIANCE.NS">RELIANCE.NS</button>
+        <button class="chip" type="button" data-sym="SBIN.NS">SBIN.NS</button>
     </div>
 
-    <div class="dashboard-wrap">
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-card-title">Market Quote</div>
-                <div id="quoteMetrics"></div>
+    <div class="status" id="status" hidden>
+        <div class="progress" role="progressbar" aria-label="Loading analysis"></div>
+        <p>Fetching prices and running the model. After a quiet spell the first lookup can take up to a minute while the server wakes up.</p>
+    </div>
+    <div class="error" id="error" role="alert" hidden></div>
+
+    <div class="results" id="results" aria-live="polite" hidden>
+        <div class="quote-head">
+            <div>
+                <h2 id="companyName" tabindex="-1">-</h2>
+                <p class="sub" id="companyMeta"></p>
             </div>
-            <div class="metric-card">
-                <div class="metric-card-title">Technical Indicators</div>
-                <div id="technicalMetrics"></div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-card-title">Live Signals</div>
-                <div id="signalsList" class="signal-wrap"></div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-card-title">Fundamentals</div>
-                <div id="fundamentalMetrics"></div>
+            <div class="price">
+                <div class="now" id="priceNow"></div>
+                <div class="chg" id="priceChg"></div>
             </div>
         </div>
 
-        <div class="chart-section">
-            <div class="chart-header">Price History — 2 Year</div>
-            <div id="priceChart"></div>
-        </div>
+        <section class="verdict" aria-labelledby="verdictLabel">
+            <div class="verdict-main">
+                <div class="label" id="verdictLabel">Overall read</div>
+                <div class="verdict-word" id="recVerdict">-</div>
+                <div class="ruler">
+                    <div class="ruler-track" id="rulerTrack">
+                        <span class="seg-ss"></span><span class="seg-s"></span><span class="seg-h"></span><span class="seg-b"></span><span class="seg-sb"></span>
+                        <div class="ruler-marker" id="rulerMarker"></div>
+                    </div>
+                    <div class="ruler-ticks" aria-hidden="true"><span>Strong sell</span><span>Sell</span><span>Hold</span><span>Buy</span><span>Strong buy</span></div>
+                </div>
+                <p class="ruler-note" id="recScore"></p>
+            </div>
+            <div class="drivers">
+                <h3>What drove it</h3>
+                <ul id="reasonsList"></ul>
+            </div>
+        </section>
 
-        <div class="bottom-grid">
-            <div class="bottom-card">
-                <div class="metric-card-title">Prediction Model</div>
-                <div id="mlPrediction"></div>
+        <section class="sec">
+            <div class="cols-3">
+                <div>
+                    <h3>Chart indicators</h3>
+                    <dl class="kv" id="technicalMetrics"></dl>
+                </div>
+                <div>
+                    <h3>Company numbers</h3>
+                    <dl class="kv" id="fundamentalMetrics"></dl>
+                </div>
+                <div>
+                    <h3>Signals right now</h3>
+                    <div class="signals" id="signalsList"></div>
+                </div>
             </div>
-            <div class="bottom-card">
-                <div class="metric-card-title">Analysis Breakdown</div>
-                <div id="reasonsList"></div>
+        </section>
+
+        <section class="sec">
+            <h2>Price, last 90 days</h2>
+            <p class="lede" id="chartNote">Closing price with the 20-day and 50-day averages.</p>
+            <div class="chart" id="priceChart" role="img" aria-label="Line chart of closing price with 20 and 50 day moving averages"></div>
+        </section>
+
+        <section class="sec">
+            <div class="cols-2">
+                <div>
+                    <h2>5-day model outlook</h2>
+                    <div id="mlPrediction"></div>
+                </div>
+                <div>
+                    <h2>Price ladder</h2>
+                    <p class="lede">Levels scale with how much this stock usually moves in a day (ATR). They are reference points, not predictions.</p>
+                    <ul class="ladder" id="priceLevels"></ul>
+                </div>
             </div>
-            <div class="bottom-card">
-                <div class="metric-card-title">Strategic Price Levels</div>
-                <div id="priceLevels"></div>
-            </div>
-        </div>
+        </section>
     </div>
 </div>
+{% endblock %}
 
-<footer>
-    <span>© 2026 Quant Bot — For informational purposes only. Not financial advice.</span>
-    <span>Powered by yfinance · Scikit-learn · Plotly</span>
-</footer>
-
+{% block scripts %}
 <script>
-    async function analyze() {
-        const symbol = document.getElementById('symbolInput').value.trim();
-        if (!symbol) return;
+(function () {
+    const $ = (id) => document.getElementById(id);
+    let lastChart = null;
 
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('dashboard').style.display = 'none';
-        document.getElementById('error').style.display = 'none';
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const isNum = (n) => typeof n === 'number' && isFinite(n);
+    const num = (n, d = 2) => isNum(n) ? n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '\u2014';
+    const pct = (n, d = 1) => isNum(n) ? (n * 100).toFixed(d) + '%' : '\u2014';
+    const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const currencyFor = (sym) => /\.(NS|BO)$/i.test(sym) ? '\u20B9' : '$';
 
+    function compact(n, cur) {
+        if (!isNum(Number(n))) return '\u2014';
+        return cur + new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(n));
+    }
+    const row = (label, value, cls = '') => `<div><dt>${esc(label)}</dt><dd class="${cls}">${value}</dd></div>`;
+
+    function setBusy(busy) {
+        $('goBtn').disabled = busy;
+        $('status').hidden = !busy;
+    }
+    function showError(msg) { $('error').textContent = msg; $('error').hidden = false; }
+
+    async function getJson(url) {
+        const res = await fetch(url);
+        try { return await res.json(); }
+        catch (e) { throw new Error("The server didn't respond properly. If it was asleep, try again in a moment."); }
+    }
+
+    async function analyze(raw) {
+        const symbol = (raw || '').trim();
+        if (!symbol) { $('symbolInput').focus(); return; }
+        $('error').hidden = true;
+        $('results').hidden = true;
+        setBusy(true);
         try {
-            const analysisRes = await fetch(`/analyze/${symbol}`);
-            const analysisData = await analysisRes.json();
-            if (!analysisData.success) throw new Error(analysisData.error);
-
-            const chartRes = await fetch(`/historical/${symbol}`);
-            const chartData = await chartRes.json();
-
-            renderDashboard(analysisData.data, chartData.data);
+            const enc = encodeURIComponent(symbol);
+            const [a, h] = await Promise.all([
+                getJson('/analyze/' + enc),
+                getJson('/historical/' + enc).catch(() => ({ success: false })),
+            ]);
+            if (!a.success) throw new Error(a.error || 'Analysis failed');
+            render(a.data, h.success ? h.data : null);
         } catch (err) {
-            document.getElementById('error').textContent = `Error: ${err.message}`;
-            document.getElementById('error').style.display = 'block';
+            showError(err.message || 'Something went wrong. Check the ticker and try again.');
         } finally {
-            document.getElementById('loading').style.display = 'none';
+            setBusy(false);
         }
     }
 
-    function renderDashboard(data, chartData) {
-        const dash = document.getElementById('dashboard');
-        dash.style.display = 'block';
-        dash.scrollIntoView({ behavior: 'smooth' });
+    function render(data, chartData) {
+        const cur = currencyFor(data.symbol);
+        const q = data.quote, rec = data.recommendation, mm = data.model_metrics || {}, ml = data.ml_prediction || {};
 
-        const rec = data.recommendation;
-        const recColors = { 'STRONG BUY': 'var(--color-buy)', 'BUY': 'var(--color-buy)', 'HOLD': 'var(--color-hold)', 'SELL': 'var(--color-sell)', 'STRONG SELL': 'var(--color-sell)' };
-        document.getElementById('recVerdict').textContent = rec.recommendation;
-        document.getElementById('recVerdict').style.color = recColors[rec.recommendation] || 'var(--text)';
-        document.getElementById('recScore').textContent = `Composite Confidence Score: ${rec.score > 0 ? '+' : ''}${rec.score.toFixed(1)}`;
+        $('results').hidden = false;
+        $('companyName').textContent = q.name || data.symbol;
+        $('companyMeta').textContent = [data.symbol, q.sector && q.sector !== 'N/A' ? q.sector : null,
+            isNum(Number(q.market_cap)) ? 'Market cap ' + compact(q.market_cap, cur) : null].filter(Boolean).join('   ');
+        $('priceNow').textContent = cur + num(q.price);
+        const up = q.change >= 0, sign = up ? '+' : '\u2212';
+        $('priceChg').className = 'chg ' + (up ? 'up' : 'down');
+        $('priceChg').textContent = `${sign}${cur}${num(Math.abs(q.change))} (${sign}${Math.abs(q.change_pct).toFixed(2)}%) today`;
 
-        const q = data.quote;
-        document.getElementById('companyName').textContent = q.name || data.symbol;
-        document.getElementById('companyMeta').textContent = `${q.sector || ''} · ${data.symbol}`;
+        renderVerdict(rec, mm);
+        renderIndicators(data, cur);
+        renderSignals(data.signals);
+        renderOutlook(ml, mm);
+        renderLadder(data.price_levels, q.price, cur);
+        drawChart(chartData);
 
-        const cc = q.change >= 0 ? 'pos' : 'neg';
-        const cs = q.change >= 0 ? '+' : '';
-        document.getElementById('quoteMetrics').innerHTML = `
-            <div class="metric-row"><span class="lbl">Asset</span><span class="val">${data.symbol}</span></div>
-            <div class="metric-row"><span class="lbl">Price</span><span class="val" style="font-size:1.1rem">$${q.price.toFixed(2)}</span></div>
-            <div class="metric-row"><span class="lbl">Change</span><span class="val ${cc}">${cs}$${q.change.toFixed(2)} (${cs}${q.change_pct.toFixed(2)}%)</span></div>
-            <div class="metric-row"><span class="lbl">Sector</span><span class="val" style="font-size:0.8rem;text-align:right">${q.sector || 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">P/E Ratio</span><span class="val">${data.quote.pe_ratio || 'N/A'}</span></div>
-        `;
+        $('companyName').focus({ preventScroll: true });
+        $('results').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    }
 
-        const t = data.technicals;
-        document.getElementById('technicalMetrics').innerHTML = `
-            <div class="metric-row"><span class="lbl">SMA 20</span><span class="val">$${t.sma_20?.toFixed(2) || 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">SMA 50</span><span class="val">$${t.sma_50?.toFixed(2) || 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">SMA 200</span><span class="val">$${t.sma_200?.toFixed(2) || 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">RSI (14)</span><span class="val ${t.rsi > 70 ? 'neg' : t.rsi < 30 ? 'pos' : ''}">${t.rsi?.toFixed(2) || 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">MACD</span><span class="val">${t.macd?.toFixed(4) || 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">Stochastic</span><span class="val">K=${t.stoch_k?.toFixed(2) || 'N/A'}</span></div>
-        `;
+    function renderVerdict(rec, mm) {
+        const word = $('recVerdict');
+        word.textContent = rec.recommendation;
+        word.className = 'verdict-word ' + (/BUY/.test(rec.recommendation) ? 'v-buy' : /SELL/.test(rec.recommendation) ? 'v-sell' : 'v-hold');
 
-        let signalsHtml = '';
-        for (const [category, signals] of Object.entries(data.signals)) {
-            if (signals.length > 0) {
-                signalsHtml += `<div class="signal-group-title">${category}</div>`;
-                for (const [type, desc] of signals) {
-                    const cls = type.includes('BUY')||type.includes('BULLISH')||type.includes('OVERSOLD') ? 's-buy' :
-                                type.includes('SELL')||type.includes('BEARISH')||type.includes('OVERBOUGHT') ? 's-sell' : 's-neutral';
-                    signalsHtml += `<span class="signal-tag ${cls}" title="${desc}">${type}</span>`;
-                }
+        const score = Number(rec.score) || 0;
+        const marker = $('rulerMarker');
+        marker.style.left = '50%';
+        const pos = Math.max(0, Math.min(1, (score + 5) / 10)) * 100;
+        setTimeout(() => { marker.style.left = pos + '%'; }, 60);
+        $('rulerTrack').parentElement.setAttribute('aria-label', `Score ${score.toFixed(1)} on a scale from minus 5 to plus 5`);
+
+        const mlText = mm.reliable ? 'The model outlook is included.' : 'The model outlook is not included yet.';
+        $('recScore').textContent = `Score ${score > 0 ? '+' : score < 0 ? '\u2212' : ''}${Math.abs(score).toFixed(1)} on a \u22125 to +5 scale, built from chart signals and company numbers. ${mlText}`;
+
+        const reasons = (rec.reasons || []).slice(0, 8);
+        const posRe = /BUY|BULLISH|OVERSOLD|Undervalued|Strong|Excellent|Good|Healthy|Low debt|: UP/;
+        const negRe = /SELL|BEARISH|OVERBOUGHT|overvalued|concern|High debt|Low liquidity|: DOWN/;
+        $('reasonsList').innerHTML = reasons.length
+            ? reasons.map((r) => `<li><span class="dot ${negRe.test(r) ? 'neg' : posRe.test(r) ? 'pos' : ''}"></span><span>${esc(r)}</span></li>`).join('')
+            : '<li class="muted">No strong signals either way, so the read stays in the middle.</li>';
+    }
+
+    function renderIndicators(data, cur) {
+        const t = data.technicals, f = data.fundamentals || {}, q = data.quote;
+        const px = (n) => isNum(n) ? cur + num(n) : '\u2014';
+        const rsiCls = t.rsi > 70 ? 'down' : t.rsi < 30 ? 'up' : '';
+        $('technicalMetrics').innerHTML =
+            row('20-day average', px(t.sma_20)) + row('50-day average', px(t.sma_50)) + row('200-day average', px(t.sma_200)) +
+            row('RSI (14)', num(t.rsi, 1), rsiCls) + row('MACD', num(t.macd, 3)) +
+            row('Stochastic K', num(t.stoch_k, 1)) + row('Typical daily range (ATR)', px(t.atr));
+
+        const fh = f.financial_health || {}, pr = f.profitability || {}, gr = f.growth || {};
+        const pe = Number(q.pe_ratio);
+        $('fundamentalMetrics').innerHTML =
+            row('P/E ratio', isNum(pe) ? num(pe, 1) : '\u2014') +
+            row('Profit margin', pct(pr.profit_margin)) + row('Return on equity', pct(pr.roe)) +
+            row('Revenue growth (yearly)', pct(gr.revenue_growth_yoy), isNum(gr.revenue_growth_yoy) ? (gr.revenue_growth_yoy >= 0 ? 'up' : 'down') : '') +
+            row('Debt to equity', isNum(fh.debt_to_equity) ? num(fh.debt_to_equity, 2) : '\u2014') +
+            row('Current ratio', isNum(fh.current_ratio) ? num(fh.current_ratio, 2) : '\u2014');
+    }
+
+    function renderSignals(signals) {
+        let html = '';
+        for (const [category, list] of Object.entries(signals || {})) {
+            if (!list || !list.length) continue;
+            html += `<div class="sig-group">${esc(category)}</div>`;
+            for (const [type, desc] of list) {
+                const cls = /BUY|BULLISH|OVERSOLD/.test(type) ? 'buy' : /SELL|BEARISH|OVERBOUGHT/.test(type) ? 'sell' : '';
+                html += `<span class="tag ${cls}" title="${esc(desc)}">${esc(type)}</span>`;
             }
         }
-        document.getElementById('signalsList').innerHTML = signalsHtml || '<span style="font-size:0.82rem;color:var(--text-muted)">No clear signals detected</span>';
+        $('signalsList').innerHTML = html || '<p class="muted">No clear signals right now.</p>';
+    }
 
-        const f = data.fundamentals;
-        document.getElementById('fundamentalMetrics').innerHTML = `
-            <div class="metric-row"><span class="lbl">Profit Margin</span><span class="val">${(f.profitability?.profit_margin*100||0).toFixed(2)}%</span></div>
-            <div class="metric-row"><span class="lbl">ROE</span><span class="val">${(f.profitability?.roe*100||0).toFixed(2)}%</span></div>
-            <div class="metric-row"><span class="lbl">Revenue Growth</span><span class="val ${f.growth?.revenue_growth_yoy>0?'pos':'neg'}">${(f.growth?.revenue_growth_yoy*100||0).toFixed(2)}%</span></div>
-            <div class="metric-row"><span class="lbl">Debt/Equity</span><span class="val">${f.financial_health?.debt_to_equity||'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">Current Ratio</span><span class="val">${f.financial_health?.current_ratio||'N/A'}</span></div>
-        `;
-
-        const ml = data.ml_prediction || {};
-        const mm = data.model_metrics || {};
-        const dirCls = ml.direction === 'UP' ? 'pos' : (ml.direction === 'DOWN' ? 'neg' : '');
-        let mlHtml = '';
-        if (ml.direction === 'UNKNOWN' || ml.prob_up == null) {
-            mlHtml = `<div class="metric-row"><span class="lbl">Status</span><span class="val">${ml.note || 'Model unavailable'}</span></div>`;
-        } else {
-            mlHtml = `
-            <div class="metric-row"><span class="lbl">${ml.horizon_days}-Day Outlook</span><span class="val ${dirCls}">${ml.direction}</span></div>
-            <div class="metric-row"><span class="lbl">Confidence</span><span class="val">${ml.confidence}</span></div>
-            <div class="metric-row"><span class="lbl">P(higher)</span><span class="val">${(ml.prob_up*100).toFixed(1)}% <small style="color:var(--text-muted)">(base ${(ml.base_rate*100).toFixed(1)}%)</small></span></div>
-            <div class="metric-row"><span class="lbl">Model edge</span><span class="val ${mm.reliable ? 'pos' : ''}">${mm.reliable ? 'Proven' : 'Not proven yet'}</span></div>
-            <div class="metric-row"><span class="lbl">Model AUC</span><span class="val">${mm.auc != null ? mm.auc.toFixed(3) : 'N/A'}</span></div>
-            <div class="metric-row"><span class="lbl">Trained on</span><span class="val">${mm.n_tickers || '?'} stocks · ${mm.version || ''}</span></div>`;
-            if (!mm.reliable) {
-                mlHtml += `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px">The model has not shown a reliable out-of-sample edge, so it is not counted in the recommendation.</div>`;
-            }
+    function renderOutlook(ml, mm) {
+        const box = $('mlPrediction');
+        if (!ml || ml.direction === 'UNKNOWN' || ml.prob_up == null) {
+            box.innerHTML = `<p class="lede" style="margin-top:8px">${esc(ml.note || 'The model is not available for this stock yet.')}</p>`;
+            return;
         }
-        document.getElementById('mlPrediction').innerHTML = mlHtml;
+        const h = ml.horizon_days || 5;
+        const lean = { UP: 'Leans higher', DOWN: 'Leans lower', NEUTRAL: 'No clear lean' }[ml.direction] || ml.direction;
+        const cls = ml.direction === 'UP' ? 'up' : ml.direction === 'DOWN' ? 'down' : '';
+        const p = ml.prob_up * 100, base = (ml.base_rate || 0.5) * 100;
+        const trained = mm.trained_at ? new Date(mm.trained_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        const proven = mm.reliable
+            ? '<span class="badge ok">Passed testing</span> It beat the usual base rate on years of data it had not seen.'
+            : '<span class="badge warn">Not proven yet</span> In testing it did no better than always guessing \u201Chigher\u201D, so it is left out of the score. Treat this as a rough lean at most.';
+        box.innerHTML = `
+            <p class="outlook ${cls}" style="margin-top:8px">${lean}</p>
+            <p class="muted">Chance the price is higher in ${h} trading days: ${p.toFixed(1)}%</p>
+            <div class="prob" aria-hidden="true">
+                <div class="prob-track">
+                    <div class="prob-fill" id="probFill"></div>
+                    <div class="prob-base" style="left:${base}%"></div>
+                </div>
+                <div class="prob-scale"><span>0%</span><span>Usual: ${base.toFixed(0)}%</span><span>100%</span></div>
+            </div>
+            <p style="margin-top:14px">${proven}</p>
+            <details>
+                <summary>How it was tested</summary>
+                <p style="margin-top:8px">Trained on ${esc(mm.n_tickers ?? '?')} stocks and about ${isNum(mm.n_rows) ? Math.round(mm.n_rows / 1000) + 'k' : '?'} daily samples${trained ? ', last updated ' + esc(trained) : ''} (version ${esc(mm.version || '?')}).
+                Each test year was held back during training. Ranking score (AUC) ${isNum(mm.auc) ? mm.auc.toFixed(3) : '\u2014'}, where 0.500 is a coin flip; it beat the base rate in ${esc(mm.positive_folds ?? '?')} of ${esc(mm.folds ?? '?')} test years.</p>
+            </details>`;
+        requestAnimationFrame(() => setTimeout(() => { const f = $('probFill'); if (f) f.style.width = p + '%'; }, 60));
+    }
 
-        document.getElementById('reasonsList').innerHTML = rec.reasons.slice(0,8)
-            .map(r => `<div class="reason-item">${r}</div>`).join('');
+    function renderLadder(levels, price, cur) {
+        const rows = [];
+        const add = (arr, kind) => (arr || []).forEach((l) => rows.push({ kind, label: l.label, price: l.price }));
+        add(levels.targets, 't'); add(levels.entry_zones, 'e'); add(levels.stop_losses, 's');
+        rows.push({ kind: 'n', label: 'Now', price });
+        rows.sort((a, b) => b.price - a.price);
+        const prefix = { t: '', e: 'Entry: ', s: 'Stop: ' };
+        $('priceLevels').innerHTML = rows.map((r) => {
+            if (r.kind === 'n') return `<li class="n"><span>Now</span><span>${cur}${num(r.price)}</span></li>`;
+            const d = (r.price / price - 1) * 100;
+            return `<li class="${r.kind}"><span class="bar"></span><span>${prefix[r.kind]}${esc(r.label)}<small>${d >= 0 ? '+' : '\u2212'}${Math.abs(d).toFixed(1)}%</small></span><b>${cur}${num(r.price)}</b></li>`;
+        }).join('');
+    }
 
-        const pl = data.price_levels;
-        document.getElementById('priceLevels').innerHTML = `
-            <div class="price-group-title">Accumulation Zones</div>
-            ${pl.entry_zones.map(l=>`<div class="price-item"><span class="pi-label">${l.label}</span><span>${'$'+l.price.toFixed(2)}</span></div>`).join('')}
-            <div class="price-group-title">Take Profit Targets</div>
-            ${pl.targets.map(l=>`<div class="price-item"><span class="pi-label">${l.label}</span><span>${'$'+l.price.toFixed(2)}</span></div>`).join('')}
-            <div class="price-group-title">Stop Loss</div>
-            ${pl.stop_losses.map(l=>`<div class="price-item"><span class="pi-label">${l.label}</span><span>${'$'+l.price.toFixed(2)}</span></div>`).join('')}
-        `;
-
+    function drawChart(chartData) {
+        lastChart = chartData;
+        const el = $('priceChart');
+        if (!chartData) { el.textContent = 'Price history is unavailable right now.'; el.className = 'muted'; el.style.height = 'auto'; return; }
+        el.className = 'chart'; el.style.height = '';
+        if (typeof Plotly === 'undefined') { setTimeout(() => drawChart(chartData), 400); return; }
+        const ink = cssVar('--ink'), ink3 = cssVar('--ink-3'), accent = cssVar('--accent'), grid = cssVar('--line-soft');
         Plotly.newPlot('priceChart', [
-            { x: chartData.dates, y: chartData.close, type:'scatter', mode:'lines', name:'Price', line:{color:'#1a1a18',width:1.5}, fill:'tozeroy', fillcolor:'rgba(26,26,24,0.04)' },
-            { x: chartData.dates, y: chartData.sma_20, type:'scatter', mode:'lines', name:'SMA 20', line:{color:'#c8a96e',width:1.5,dash:'dot'} },
-            { x: chartData.dates, y: chartData.sma_50, type:'scatter', mode:'lines', name:'SMA 50', line:{color:'#8b5e2a',width:1.5,dash:'dash'} }
+            { x: chartData.dates, y: chartData.close, type: 'scatter', mode: 'lines', name: 'Close', line: { color: ink, width: 2 } },
+            { x: chartData.dates, y: chartData.sma_20, type: 'scatter', mode: 'lines', name: '20-day', line: { color: accent, width: 1.5 } },
+            { x: chartData.dates, y: chartData.sma_50, type: 'scatter', mode: 'lines', name: '50-day', line: { color: ink3, width: 1.5, dash: 'dash' } },
         ], {
-            paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
-            font:{color:'#7a7971',family:'Inter',size:11},
-            xaxis:{gridcolor:'#e0ddd6',zeroline:false},
-            yaxis:{gridcolor:'#e0ddd6',zeroline:false},
-            margin:{t:20,l:60,r:20,b:40},
-            showlegend:true, legend:{orientation:'h',y:1.1,font:{color:'#7a7971'}},
-            hovermode:'x unified'
-        }, { responsive:true, displayModeBar:false });
+            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: ink3, family: 'Schibsted Grotesk, system-ui, sans-serif', size: 12 },
+            xaxis: { gridcolor: grid, zeroline: false, showline: false },
+            yaxis: { gridcolor: grid, zeroline: false, showline: false },
+            margin: { t: 10, l: 52, r: 12, b: 32 },
+            showlegend: true, legend: { orientation: 'h', y: 1.12, x: 0 },
+            hovermode: 'x unified',
+        }, { responsive: true, displayModeBar: false });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('symbolInput').addEventListener('keypress', e => {
-            if (e.key === 'Enter') analyze();
-        });
-    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (lastChart && !$('results').hidden) drawChart(lastChart); });
+    $('finder').addEventListener('submit', (e) => { e.preventDefault(); analyze($('symbolInput').value); });
+    document.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => { $('symbolInput').value = b.dataset.sym; analyze(b.dataset.sym); }));
+})();
 </script>
-</body>
-</html>
+{% endblock %}

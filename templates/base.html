@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Quant Bot{% endblock %}</title>
+    <meta name="description" content="Look up a US or Indian stock: chart signals, company numbers and a tested 5-day model outlook.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="top">
+        <div class="wrap top-in">
+            <a class="brand" href="/">Quant Bot</a>
+            <nav aria-label="Main">
+                <a href="/" {% if request.path == '/' %}aria-current="page"{% endif %}>Analyze</a>
+                <a href="/accuracy" {% if request.path == '/accuracy' %}aria-current="page"{% endif %}>Scorecard</a>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div class="foot-wrap">
+        <footer class="wrap foot">
+            <p>For learning and research only, not financial advice. Prices come from Yahoo Finance and can be delayed. Past patterns do not guarantee future results.</p>
+        </footer>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
