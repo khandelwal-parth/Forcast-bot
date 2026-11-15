@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Scorecard | Quant Bot{% endblock %}
 
+{% block head %}<noscript><style>.cmp-row .bar i { width: var(--w) !important; }</style></noscript>{% endblock %}
+
 {% block content %}
 {% set o = data.overall %}
 <div class="wrap">
@@ -15,12 +17,12 @@
         <div class="compare">
             <div class="cmp-row">
                 <span>Model win rate</span>
-                <div class="bar"><i style="width: {{ o.win_rate }}%"></i></div>
+                <div class="bar"><i style="--w: {{ o.win_rate }}%"></i></div>
                 <b>{{ o.win_rate }}%</b>
             </div>
             <div class="cmp-row base">
                 <span>Always-UP Baseline</span>
-                <div class="bar"><i style="width: {{ o.baseline_up_rate }}%"></i></div>
+                <div class="bar"><i style="--w: {{ o.baseline_up_rate }}%"></i></div>
                 <b>{{ o.baseline_up_rate }}%</b>
             </div>
         </div>
@@ -37,11 +39,11 @@
 
     <section class="sec">
         <div class="counts">
-            <div><div class="n">{{ o.total }}</div><div class="l">Scored calls</div></div>
-            <div><div class="n up">{{ o.correct }}</div><div class="l">Right direction</div></div>
-            <div><div class="n down">{{ o.total - o.correct }}</div><div class="l">Wrong direction</div></div>
-            <div><div class="n">{{ o.pending }}</div><div class="l">Waiting for the 5 days</div></div>
-            <div><div class="n">{{ o.neutral }}</div><div class="l">Neutral, not scored</div></div>
+            <div><div class="n" data-count="{{ o.total }}">{{ o.total }}</div><div class="l">Scored calls</div></div>
+            <div><div class="n up" data-count="{{ o.correct }}">{{ o.correct }}</div><div class="l">Right direction</div></div>
+            <div><div class="n down" data-count="{{ o.total - o.correct }}">{{ o.total - o.correct }}</div><div class="l">Wrong direction</div></div>
+            <div><div class="n" data-count="{{ o.pending }}">{{ o.pending }}</div><div class="l">Waiting for the 5 days</div></div>
+            <div><div class="n" data-count="{{ o.neutral }}">{{ o.neutral }}</div><div class="l">Neutral, not scored</div></div>
         </div>
     </section>
 
@@ -51,12 +53,12 @@
         <div class="compare">
             <div class="cmp-row">
                 <span>UP calls ({{ data.by_direction.up.correct }}/{{ data.by_direction.up.total }})</span>
-                <div class="bar"><i style="width: {{ data.by_direction.up.win_rate }}%"></i></div>
+                <div class="bar"><i style="--w: {{ data.by_direction.up.win_rate }}%"></i></div>
                 <b>{{ data.by_direction.up.win_rate }}%</b>
             </div>
             <div class="cmp-row">
                 <span>DOWN calls ({{ data.by_direction.down.correct }}/{{ data.by_direction.down.total }})</span>
-                <div class="bar"><i style="width: {{ data.by_direction.down.win_rate }}%"></i></div>
+                <div class="bar"><i style="--w: {{ data.by_direction.down.win_rate }}%"></i></div>
                 <b>{{ data.by_direction.down.win_rate }}%</b>
             </div>
         </div>
@@ -160,4 +162,16 @@
         {% endif %}
     </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    QB.onView('.compare');
+    QB.onView('.counts', function (box) {
+        box.querySelectorAll('[data-count]').forEach(function (el) {
+            var to = parseFloat(el.dataset.count) || 0;
+            QB.countTo(el, 0, to, function (v) { return Math.round(v).toLocaleString('en-US'); }, 900);
+        });
+    });
+</script>
 {% endblock %}

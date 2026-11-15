@@ -1,34 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Quant Bot: stock analysis{% endblock %}
-{% block head %}<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" defer></script>{% endblock %}
 
 {% block content %}
+<section class="hero">
+    <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 800 300" preserveAspectRatio="none">
+            <defs>
+                <linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" style="stop-color: var(--accent)" stop-opacity="0.22"/>
+                    <stop offset="1" style="stop-color: var(--accent)" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <path id="heroArea" class="hero-area" fill="url(#heroFill)"/>
+            <path id="heroLine" class="hero-line" pathLength="1"/>
+        </svg>
+    </div>
+    <div class="wrap hero-copy">
+        <section class="page-head">
+            <h1>Look up a stock</h1>
+            <p>Chart signals, company numbers and a 5-day model outlook for US and Indian stocks. The model counts toward the score only after it has proven itself in testing.</p>
+        </section>
+
+        <form class="finder" id="finder" role="search" autocomplete="off">
+            <label for="symbolInput" class="sr">Ticker symbol</label>
+            <input type="text" id="symbolInput" placeholder="Ticker, e.g. AAPL or RELIANCE" inputmode="text" autocapitalize="characters" spellcheck="false" aria-describedby="hint">
+            <button class="btn" id="goBtn" type="submit">Analyze</button>
+        </form>
+        <div class="chips" id="hint">
+            Try
+            <button class="chip" type="button" data-sym="AAPL">AAPL</button>
+            <button class="chip" type="button" data-sym="NVDA">NVDA</button>
+            <button class="chip" type="button" data-sym="TCS.NS">TCS.NS</button>
+            <button class="chip" type="button" data-sym="RELIANCE.NS">RELIANCE.NS</button>
+            <button class="chip" type="button" data-sym="SBIN.NS">SBIN.NS</button>
+        </div>
+
+        <div class="status" id="status" hidden>
+            <svg class="scan" viewBox="0 0 120 28" aria-hidden="true"><path pathLength="1" d="M2 22 L18 13 L30 18 L48 6 L62 15 L80 9 L96 19 L118 4"/></svg>
+            <p id="statusMsg" role="status">Fetching prices...</p>
+            <p class="small">After a quiet spell the first lookup can take up to a minute while the server wakes up.</p>
+        </div>
+        <div class="error" id="error" role="alert" hidden></div>
+    </div>
+</section>
+
 <div class="wrap">
-    <section class="page-head">
-        <h1>Look up a stock</h1>
-        <p>Chart signals, company numbers and a 5-day model outlook for US and Indian stocks. The model counts toward the score only after it has proven itself in testing.</p>
-    </section>
-
-    <form class="finder" id="finder" role="search" autocomplete="off">
-        <label for="symbolInput" class="skip" style="left:-999px">Ticker symbol</label>
-        <input type="text" id="symbolInput" placeholder="Ticker, e.g. AAPL or RELIANCE" inputmode="text" autocapitalize="characters" spellcheck="false" aria-describedby="hint">
-        <button class="btn" id="goBtn" type="submit">Analyze</button>
-    </form>
-    <div class="chips" id="hint">
-        Try
-        <button class="chip" type="button" data-sym="AAPL">AAPL</button>
-        <button class="chip" type="button" data-sym="NVDA">NVDA</button>
-        <button class="chip" type="button" data-sym="TCS.NS">TCS.NS</button>
-        <button class="chip" type="button" data-sym="RELIANCE.NS">RELIANCE.NS</button>
-        <button class="chip" type="button" data-sym="SBIN.NS">SBIN.NS</button>
-    </div>
-
-    <div class="status" id="status" hidden>
-        <div class="progress" role="progressbar" aria-label="Loading analysis"></div>
-        <p>Fetching prices and running the model. After a quiet spell the first lookup can take up to a minute while the server wakes up.</p>
-    </div>
-    <div class="error" id="error" role="alert" hidden></div>
-
     <div class="results" id="results" aria-live="polite" hidden>
         <div class="quote-head">
             <div>
@@ -44,7 +60,7 @@
         <section class="verdict" aria-labelledby="verdictLabel">
             <div class="verdict-main">
                 <div class="label" id="verdictLabel">Overall read</div>
-                <div class="verdict-word" id="recVerdict">-</div>
+                <div class="verdict-word" id="verdictWord"><span id="recVerdict" aria-hidden="true">-</span><span class="sr" id="recVerdictSr"></span></div>
                 <div class="ruler">
                     <div class="ruler-track" id="rulerTrack">
                         <span class="seg-ss"></span><span class="seg-s"></span><span class="seg-h"></span><span class="seg-b"></span><span class="seg-sb"></span>
@@ -80,7 +96,8 @@
         <section class="sec">
             <h2>Price, last 90 days</h2>
             <p class="lede" id="chartNote">Closing price with the 20-day and 50-day averages.</p>
-            <div class="chart" id="priceChart" role="img" aria-label="Line chart of closing price with 20 and 50 day moving averages"></div>
+            <div class="legend" id="chartLegend" aria-hidden="true"><span><i></i>Close</span><span class="l20"><i></i>20-day average</span><span class="l50"><i></i>50-day average</span></div>
+            <div class="chart" id="priceChart" role="img" aria-label="Line chart of the closing price with 20 and 50 day averages"></div>
         </section>
 
         <section class="sec">
@@ -104,14 +121,14 @@
 <script>
 (function () {
     const $ = (id) => document.getElementById(id);
-    let lastChart = null;
+    let lastChart = null, lastCur = '$', statusTimer = null;
 
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const isNum = (n) => typeof n === 'number' && isFinite(n);
     const num = (n, d = 2) => isNum(n) ? n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '\u2014';
     const pct = (n, d = 1) => isNum(n) ? (n * 100).toFixed(d) + '%' : '\u2014';
-    const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const currencyFor = (sym) => /\.(NS|BO)$/i.test(sym) ? '\u20B9' : '$';
+    const SVGNS = 'http://www.w3.org/2000/svg';
 
     function compact(n, cur) {
         if (!isNum(Number(n))) return '\u2014';
@@ -119,9 +136,66 @@
     }
     const row = (label, value, cls = '') => `<div><dt>${esc(label)}</dt><dd class="${cls}">${value}</dd></div>`;
 
+    /* ---------- hero line: a seeded random walk that reshapes as you type ---------- */
+    function hash(str) {
+        let h = 1779033703 ^ str.length;
+        for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+        return h >>> 0;
+    }
+    function rng(seed) {
+        return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    }
+    function walk(seedStr, n = 36) {
+        const r = rng(hash(seedStr || 'QUANT')), pts = [];
+        let v = 0;
+        for (let i = 0; i < n; i++) { v += (r() - 0.44) * 1.0; pts.push(v); }
+        const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+        return pts.map((p) => 0.14 + 0.72 * (p - lo) / span);
+    }
+    function heroPath(pts) {
+        const W = 800, H = 300, n = pts.length;
+        const xy = pts.map((p, i) => [(i / (n - 1)) * W, H - p * H]);
+        let d = `M${xy[0][0].toFixed(1)} ${xy[0][1].toFixed(1)}`;
+        for (let i = 1; i < n; i++) {
+            const mx = (xy[i - 1][0] + xy[i][0]) / 2, my = (xy[i - 1][1] + xy[i][1]) / 2;
+            d += ` Q${xy[i - 1][0].toFixed(1)} ${xy[i - 1][1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
+        }
+        d += ` T${xy[n - 1][0].toFixed(1)} ${xy[n - 1][1].toFixed(1)}`;
+        return { line: d, area: d + ` L${W} ${H} L0 ${H} Z` };
+    }
+    let heroPts = walk('QUANT'), heroRaf = 0;
+    function paintHero(pts) { const p = heroPath(pts); $('heroLine').setAttribute('d', p.line); $('heroArea').setAttribute('d', p.area); }
+    function morphHero(seedStr) {
+        const to = walk(seedStr), from = heroPts.slice();
+        cancelAnimationFrame(heroRaf);
+        if (QB.reduce()) { heroPts = to; paintHero(to); return; }
+        const t0 = performance.now(), dur = 650;
+        (function step(now) {
+            const p = QB.ease(Math.min(1, (now - t0) / dur));
+            heroPts = from.map((v, i) => v + (to[i] - v) * p);
+            paintHero(heroPts);
+            if (p < 1) heroRaf = requestAnimationFrame(step);
+        })(t0);
+    }
+    function initHero() {
+        paintHero(heroPts);
+        if (QB.reduce()) { $('heroLine').style.strokeDashoffset = 0; $('heroArea').style.opacity = 1; return; }
+        requestAnimationFrame(() => { $('heroLine').classList.add('go'); $('heroArea').classList.add('go'); });
+        $('heroLine').addEventListener('animationend', () => { $('heroLine').style.strokeDasharray = 'none'; $('heroLine').style.strokeDashoffset = 0; });
+    }
+
+    /* ---------- loading ---------- */
+    const STAGES = ['Fetching two years of prices...', 'Reading the chart indicators...', 'Checking the company numbers...', 'Running the model...'];
     function setBusy(busy) {
         $('goBtn').disabled = busy;
         $('status').hidden = !busy;
+        clearInterval(statusTimer);
+        if (busy) {
+            let i = 0;
+            $('statusMsg').textContent = STAGES[0];
+            statusTimer = setInterval(() => { i = Math.min(i + 1, STAGES.length - 1); $('statusMsg').textContent = STAGES[i]; }, 1700);
+        }
     }
     function showError(msg) { $('error').textContent = msg; $('error').hidden = false; }
 
@@ -154,14 +228,17 @@
 
     function render(data, chartData) {
         const cur = currencyFor(data.symbol);
+        lastCur = cur;
         const q = data.quote, rec = data.recommendation, mm = data.model_metrics || {}, ml = data.ml_prediction || {};
 
         $('results').hidden = false;
         $('companyName').textContent = q.name || data.symbol;
         $('companyMeta').textContent = [data.symbol, q.sector && q.sector !== 'N/A' ? q.sector : null,
             isNum(Number(q.market_cap)) ? 'Market cap ' + compact(q.market_cap, cur) : null].filter(Boolean).join('   ');
-        $('priceNow').textContent = cur + num(q.price);
+
+        // price rolls into place like a live tick
         const up = q.change >= 0, sign = up ? '+' : '\u2212';
+        QB.countTo($('priceNow'), q.price * 0.985, q.price, (v) => cur + num(v), 800);
         $('priceChg').className = 'chg ' + (up ? 'up' : 'down');
         $('priceChg').textContent = `${sign}${cur}${num(Math.abs(q.change))} (${sign}${Math.abs(q.change_pct).toFixed(2)}%) today`;
 
@@ -170,22 +247,27 @@
         renderSignals(data.signals);
         renderOutlook(ml, mm);
         renderLadder(data.price_levels, q.price, cur);
-        drawChart(chartData);
+        drawChart(chartData, cur, true);
 
         $('companyName').focus({ preventScroll: true });
-        $('results').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+        $('results').scrollIntoView({ behavior: QB.reduce() ? 'auto' : 'smooth', block: 'start' });
     }
 
     function renderVerdict(rec, mm) {
-        const word = $('recVerdict');
-        word.textContent = rec.recommendation;
-        word.className = 'verdict-word ' + (/BUY/.test(rec.recommendation) ? 'v-buy' : /SELL/.test(rec.recommendation) ? 'v-sell' : 'v-hold');
+        const wordBox = $('verdictWord');
+        wordBox.className = 'verdict-word ' + (/BUY/.test(rec.recommendation) ? 'v-buy' : /SELL/.test(rec.recommendation) ? 'v-sell' : 'v-hold');
+        $('recVerdictSr').textContent = rec.recommendation;
+        QB.flip($('recVerdict'), rec.recommendation, 750);
 
         const score = Number(rec.score) || 0;
-        const marker = $('rulerMarker');
+        const marker = $('rulerMarker'), segs = [...$('rulerTrack').querySelectorAll('span')];
         marker.style.left = '50%';
-        const pos = Math.max(0, Math.min(1, (score + 5) / 10)) * 100;
-        setTimeout(() => { marker.style.left = pos + '%'; }, 60);
+        segs.forEach((sg) => sg.classList.remove('on'));
+        const frac = Math.max(0, Math.min(1, (score + 5) / 10));
+        setTimeout(() => {
+            marker.style.left = (frac * 100) + '%';
+            segs[Math.min(4, Math.floor(frac * 5))].classList.add('on');
+        }, 120);
         $('rulerTrack').parentElement.setAttribute('aria-label', `Score ${score.toFixed(1)} on a scale from minus 5 to plus 5`);
 
         const mlText = mm.reliable ? 'The model outlook is included.' : 'The model outlook is not included yet.';
@@ -195,7 +277,7 @@
         const posRe = /BUY|BULLISH|OVERSOLD|Undervalued|Strong|Excellent|Good|Healthy|Low debt|: UP/;
         const negRe = /SELL|BEARISH|OVERBOUGHT|overvalued|concern|High debt|Low liquidity|: DOWN/;
         $('reasonsList').innerHTML = reasons.length
-            ? reasons.map((r) => `<li><span class="dot ${negRe.test(r) ? 'neg' : posRe.test(r) ? 'pos' : ''}"></span><span>${esc(r)}</span></li>`).join('')
+            ? reasons.map((r, i) => `<li class="rise" style="--i:${i + 3}"><span class="dot ${negRe.test(r) ? 'neg' : posRe.test(r) ? 'pos' : ''}"></span><span>${esc(r)}</span></li>`).join('')
             : '<li class="muted">No strong signals either way, so the read stays in the middle.</li>';
     }
 
@@ -219,13 +301,13 @@
     }
 
     function renderSignals(signals) {
-        let html = '';
+        let html = '', i = 0;
         for (const [category, list] of Object.entries(signals || {})) {
             if (!list || !list.length) continue;
             html += `<div class="sig-group">${esc(category)}</div>`;
             for (const [type, desc] of list) {
                 const cls = /BUY|BULLISH|OVERSOLD/.test(type) ? 'buy' : /SELL|BEARISH|OVERBOUGHT/.test(type) ? 'sell' : '';
-                html += `<span class="tag ${cls}" title="${esc(desc)}">${esc(type)}</span>`;
+                html += `<span class="tag rise ${cls}" style="--i:${i++ + 2}" title="${esc(desc)}">${esc(type)}</span>`;
             }
         }
         $('signalsList').innerHTML = html || '<p class="muted">No clear signals right now.</p>';
@@ -247,7 +329,7 @@
             : '<span class="badge warn">Not proven yet</span> In testing it did no better than always guessing \u201Chigher\u201D, so it is left out of the score. Treat this as a rough lean at most.';
         box.innerHTML = `
             <p class="outlook ${cls}" style="margin-top:8px">${lean}</p>
-            <p class="muted">Chance the price is higher in ${h} trading days: ${p.toFixed(1)}%</p>
+            <p class="muted">Chance the price is higher in ${h} trading days: <span id="probNum">${p.toFixed(1)}</span>%</p>
             <div class="prob" aria-hidden="true">
                 <div class="prob-track">
                     <div class="prob-fill" id="probFill"></div>
@@ -261,7 +343,8 @@
                 <p style="margin-top:8px">Trained on ${esc(mm.n_tickers ?? '?')} stocks and about ${isNum(mm.n_rows) ? Math.round(mm.n_rows / 1000) + 'k' : '?'} daily samples${trained ? ', last updated ' + esc(trained) : ''} (version ${esc(mm.version || '?')}).
                 Each test year was held back during training. Ranking score (AUC) ${isNum(mm.auc) ? mm.auc.toFixed(3) : '\u2014'}, where 0.500 is a coin flip; it beat the base rate in ${esc(mm.positive_folds ?? '?')} of ${esc(mm.folds ?? '?')} test years.</p>
             </details>`;
-        requestAnimationFrame(() => setTimeout(() => { const f = $('probFill'); if (f) f.style.width = p + '%'; }, 60));
+        requestAnimationFrame(() => setTimeout(() => { const f = $('probFill'); if (f) f.style.width = p + '%'; }, 80));
+        QB.countTo($('probNum'), 50, p, (v) => v.toFixed(1), 900);
     }
 
     function renderLadder(levels, price, cur) {
@@ -271,38 +354,99 @@
         rows.push({ kind: 'n', label: 'Now', price });
         rows.sort((a, b) => b.price - a.price);
         const prefix = { t: '', e: 'Entry: ', s: 'Stop: ' };
-        $('priceLevels').innerHTML = rows.map((r) => {
-            if (r.kind === 'n') return `<li class="n"><span>Now</span><span>${cur}${num(r.price)}</span></li>`;
+        $('priceLevels').innerHTML = rows.map((r, i) => {
+            if (r.kind === 'n') return `<li class="n rise" style="--i:${i}"><span>Now</span><span>${cur}${num(r.price)}</span></li>`;
             const d = (r.price / price - 1) * 100;
-            return `<li class="${r.kind}"><span class="bar"></span><span>${prefix[r.kind]}${esc(r.label)}<small>${d >= 0 ? '+' : '\u2212'}${Math.abs(d).toFixed(1)}%</small></span><b>${cur}${num(r.price)}</b></li>`;
+            return `<li class="${r.kind} rise" style="--i:${i}"><span class="bar"></span><span>${prefix[r.kind]}${esc(r.label)}<small>${d >= 0 ? '+' : '\u2212'}${Math.abs(d).toFixed(1)}%</small></span><b>${cur}${num(r.price)}</b></li>`;
         }).join('');
     }
 
-    function drawChart(chartData) {
-        lastChart = chartData;
+    /* ---------- price chart: self-drawing SVG with a hover crosshair ---------- */
+    function niceTicks(lo, hi, count) {
+        const raw = (hi - lo) / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((st) => st >= raw) || raw;
+        const out = [];
+        for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(v);
+        return out;
+    }
+    const fmtDate = (d, long) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', long ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
+
+    function drawChart(data, cur, animate) {
+        lastChart = data;
         const el = $('priceChart');
-        if (!chartData) { el.textContent = 'Price history is unavailable right now.'; el.className = 'muted'; el.style.height = 'auto'; return; }
-        el.className = 'chart'; el.style.height = '';
-        if (typeof Plotly === 'undefined') { setTimeout(() => drawChart(chartData), 400); return; }
-        const ink = cssVar('--ink'), ink3 = cssVar('--ink-3'), accent = cssVar('--accent'), grid = cssVar('--line-soft');
-        Plotly.newPlot('priceChart', [
-            { x: chartData.dates, y: chartData.close, type: 'scatter', mode: 'lines', name: 'Close', line: { color: ink, width: 2 } },
-            { x: chartData.dates, y: chartData.sma_20, type: 'scatter', mode: 'lines', name: '20-day', line: { color: accent, width: 1.5 } },
-            { x: chartData.dates, y: chartData.sma_50, type: 'scatter', mode: 'lines', name: '50-day', line: { color: ink3, width: 1.5, dash: 'dash' } },
-        ], {
-            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-            font: { color: ink3, family: 'Schibsted Grotesk, system-ui, sans-serif', size: 12 },
-            xaxis: { gridcolor: grid, zeroline: false, showline: false },
-            yaxis: { gridcolor: grid, zeroline: false, showline: false },
-            margin: { t: 10, l: 52, r: 12, b: 32 },
-            showlegend: true, legend: { orientation: 'h', y: 1.12, x: 0 },
-            hovermode: 'x unified',
-        }, { responsive: true, displayModeBar: false });
+        el.className = 'chart';
+        $('chartLegend').hidden = !(data && data.close && data.close.length > 1);
+        if (!data || !data.close || data.close.length < 2) {
+            el.className = 'muted'; el.textContent = 'Price history is unavailable right now.'; return;
+        }
+        const W = Math.max(300, el.clientWidth || 700), H = W < 520 ? 270 : 340;
+        const m = { l: 54, r: 12, t: 12, b: 28 }, n = data.close.length;
+        const vals = [...data.close, ...(data.sma_20 || []), ...(data.sma_50 || [])].filter(isNum);
+        let lo = Math.min(...vals), hi = Math.max(...vals);
+        const pad = (hi - lo) * 0.07 || hi * 0.02; lo -= pad; hi += pad;
+        const x = (i) => m.l + (W - m.l - m.r) * (i / (n - 1));
+        const y = (v) => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+        const path = (arr) => { let d = '', pen = false; arr.forEach((v, i) => { if (!isNum(v)) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); pen = true; }); return d; };
+        const base = H - m.b;
+        const closeD = path(data.close);
+        const areaD = closeD + `L${x(n - 1).toFixed(1)} ${base} L${x(0).toFixed(1)} ${base}Z`;
+
+        const grid = niceTicks(lo, hi, 4).map((v) =>
+            `<line class="c-grid" x1="${m.l}" x2="${W - m.r}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="c-axis" x="${m.l - 8}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${num(v, v < 100 ? 2 : 0)}</text>`).join('');
+        const xs = [0, Math.round((n - 1) / 3), Math.round(2 * (n - 1) / 3), n - 1];
+        const xl = xs.map((i, k) => `<text class="c-axis" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="${k === 0 ? 'start' : k === xs.length - 1 ? 'end' : 'middle'}">${fmtDate(data.dates[i])}</text>`).join('');
+
+        el.innerHTML = `
+            <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+                <defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" style="stop-color: var(--ink)" stop-opacity="0.12"/><stop offset="1" style="stop-color: var(--ink)" stop-opacity="0"/></linearGradient></defs>
+                ${grid}${xl}
+                <path class="c-area" d="${areaD}" fill="url(#chartFill)"/>
+                <path class="c-sma c-sma50" pathLength="1" d="${path(data.sma_50 || [])}"/>
+                <path class="c-sma c-sma20" pathLength="1" d="${path(data.sma_20 || [])}"/>
+                <path class="c-line" pathLength="1" d="${closeD}"/>
+                <line class="c-hair" y1="${m.t}" y2="${base}" x1="0" x2="0"/>
+                <circle class="c-dot" r="5" cx="0" cy="0"/>
+            </svg>
+            <div class="c-tip" id="chartTip"></div>`;
+        const first = data.close.find(isNum), last = data.close[n - 1];
+        el.setAttribute('aria-label', `Closing price ${last >= first ? 'rose' : 'fell'} from ${cur}${num(first)} to ${cur}${num(last)} between ${fmtDate(data.dates[0], true)} and ${fmtDate(data.dates[n - 1], true)}`);
+
+        if (animate && !QB.reduce()) requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('go')));
+        else el.classList.add('go', 'instant');
+
+        const svg = el.querySelector('svg'), hair = el.querySelector('.c-hair'), dot = el.querySelector('.c-dot'), tip = $('chartTip');
+        const show = (clientX) => {
+            const r = svg.getBoundingClientRect(), px = (clientX - r.left) * (W / r.width);
+            const i = Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / (W - m.l - m.r)) * (n - 1))));
+            hair.setAttribute('x1', x(i)); hair.setAttribute('x2', x(i));
+            dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(data.close[i]));
+            const line = (name, v) => isNum(v) ? `<div>${name} ${cur}${num(v)}</div>` : '';
+            tip.innerHTML = `<b>${fmtDate(data.dates[i], true)}</b><div>Close ${cur}${num(data.close[i])}</div>${line('20-day', (data.sma_20 || [])[i])}${line('50-day', (data.sma_50 || [])[i])}`;
+            const scale = r.width / W, tw = tip.offsetWidth;
+            let left = x(i) * scale + 14;
+            if (left + tw > r.width) left = x(i) * scale - tw - 14;
+            tip.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, y(data.close[i]) * scale - 20)}px)`;
+            el.classList.add('hover');
+        };
+        svg.addEventListener('pointermove', (e) => show(e.clientX));
+        svg.addEventListener('pointerdown', (e) => show(e.clientX));
+        svg.addEventListener('pointerleave', () => el.classList.remove('hover'));
     }
 
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (lastChart && !$('results').hidden) drawChart(lastChart); });
+    let resizeT;
+    new ResizeObserver(() => {
+        clearTimeout(resizeT);
+        resizeT = setTimeout(() => { if (lastChart && !$('results').hidden) drawChart(lastChart, lastCur, false); }, 150);
+    }).observe($('priceChart'));
+
+    let typeT;
+    $('symbolInput').addEventListener('input', () => { clearTimeout(typeT); typeT = setTimeout(() => morphHero($('symbolInput').value.trim().toUpperCase() || 'QUANT'), 120); });
     $('finder').addEventListener('submit', (e) => { e.preventDefault(); analyze($('symbolInput').value); });
-    document.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => { $('symbolInput').value = b.dataset.sym; analyze(b.dataset.sym); }));
+    document.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => {
+        $('symbolInput').value = b.dataset.sym; morphHero(b.dataset.sym); analyze(b.dataset.sym);
+    }));
+    initHero();
 })();
 </script>
 {% endblock %}
